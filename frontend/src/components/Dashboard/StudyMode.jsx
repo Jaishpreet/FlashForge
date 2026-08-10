@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Flashcard from '../Common/Flashcard';
+import { API_URL } from '../config';
 
 const StudyMode = () => {
     const { id } = useParams();
@@ -18,10 +19,10 @@ const StudyMode = () => {
 
     const fetchSet = async () => {
         try {
-            const response = await axios.get(`http://localhost:5000/api/flashcards/${id}`);
+            const response = await axios.get(`${API_URL}/flashcards/${id}`);
             setSet(response.data);
             
-            await axios.patch(`http://localhost:5000/api/flashcards/${id}/study`);
+            await axios.patch(`${API_URL}/flashcards/${id}/study`);
         } catch (error) {
             toast.error('Failed to load flashcard set');
             navigate('/sets');

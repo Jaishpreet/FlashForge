@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { API_URL } from '../config';
 
 const MySets = () => {
     const [sets, setSets] = useState([]);
@@ -14,7 +15,7 @@ const MySets = () => {
 
     const fetchSets = async () => {
         try {
-            const response = await axios.get('http://localhost:5000/api/flashcards');
+            const response = await axios.get(`${API_URL}/flashcards`);
             setSets(response.data);
         } catch (error) {
             toast.error('Failed to load flashcard sets');

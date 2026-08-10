@@ -8,7 +8,7 @@ import InputPage from './components/Dashboard/InputPage';
 import MySets from './components/Dashboard/MySets';
 import StudyMode from './components/Dashboard/StudyMode';
 import Navbar from './components/Common/Navbar';
-import { API_URL } from '../config';
+import { API_URL } from './config';
 
 const PrivateRoute = ({ children }) => {
     const { user, loading } = useAuth();

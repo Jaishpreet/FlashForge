@@ -1,7 +1,4 @@
 [build]
   base = "frontend"
   command = "chmod +x ./node_modules/.bin/vite && npm run build"
-  publish = "frontend/dist"
-
-[build.environment]
-  NODE_VERSION = "18"
+  publish = "dist"                    # ← CHANGED from "frontend/dist" to just "dist"

@@ -8,6 +8,7 @@ import { API_URL } from '../../config';
 const MySets = () => {
     const [sets, setSets] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [deletingId, setDeletingId] = useState(null);
 
     useEffect(() => {
         fetchSets();
@@ -21,6 +22,25 @@ const MySets = () => {
             toast.error('Failed to load flashcard sets');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (id, topic) => {
+        // Confirm with user
+        if (!window.confirm(`Are you sure you want to delete "${topic}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        setDeletingId(id);
+        try {
+            await axios.delete(`${API_URL}/flashcards/${id}`);
+            // Remove from UI
+            setSets(sets.filter(set => set.id !== id));
+            toast.success(`"${topic}" deleted successfully!`);
+        } catch (error) {
+            toast.error('Failed to delete flashcard set');
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -63,7 +83,7 @@ const MySets = () => {
                     {sets.map((set) => (
                         <div
                             key={set.id}
-                            className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all p-6 border border-gray-100 hover:border-indigo-200"
+                            className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all p-6 border border-gray-100 hover:border-indigo-200 relative group"
                         >
                             <div className="flex items-start justify-between mb-3">
                                 <h3 className="text-xl font-semibold text-gray-900 truncate flex-1">
@@ -92,6 +112,22 @@ const MySets = () => {
                                     </span>
                                 )}
                             </div>
+                            
+                            {/* Delete Button */}
+                            <button
+                                onClick={() => handleDelete(set.id, set.topic)}
+                                disabled={deletingId === set.id}
+                                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 p-1.5 rounded-full"
+                                title="Delete this set"
+                            >
+                                {deletingId === set.id ? (
+                                    <span className="inline-block w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></span>
+                                ) : (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg>
+                                )}
+                            </button>
                         </div>
                     ))}
                 </div>

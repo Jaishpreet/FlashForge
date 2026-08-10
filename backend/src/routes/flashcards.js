@@ -285,4 +285,25 @@ router.patch('/:id/study', auth, async (req, res) => {
     }
 });
 
+// DELETE /api/flashcards/:id - Delete a flashcard set
+router.delete('/:id', auth, async (req, res) => {
+    try {
+        const set = await FlashcardSet.findOneAndDelete({ 
+            _id: req.params.id, 
+            userId: req.userId 
+        });
+
+        if (!set) {
+            return res.status(404).json({ error: 'Flashcard set not found' });
+        }
+
+        res.json({ 
+            message: 'Flashcard set deleted successfully',
+            id: req.params.id 
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

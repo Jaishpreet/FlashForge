@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
-import { API_URL } from '../config';
+import { API_URL } from '../../../config';
 
 const MySets = () => {
     const [sets, setSets] = useState([]);

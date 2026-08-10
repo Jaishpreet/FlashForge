@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Flashcard from '../Common/Flashcard';
-import { API_URL } from '../config';
+import { API_URL } from '../../../config';
 
 const StudyMode = () => {
     const { id } = useParams();

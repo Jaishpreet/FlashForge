@@ -21,7 +21,6 @@ const StudyMode = () => {
             const response = await axios.get(`http://localhost:5000/api/flashcards/${id}`);
             setSet(response.data);
             
-            // Update study count
             await axios.patch(`http://localhost:5000/api/flashcards/${id}/study`);
         } catch (error) {
             toast.error('Failed to load flashcard set');
@@ -66,7 +65,7 @@ const StudyMode = () => {
                     onClick={() => navigate('/sets')}
                     className="mt-4 text-indigo-600 hover:text-indigo-800 font-medium"
                 >
-                    Back to my sets →
+                    ← Back to my sets
                 </button>
             </div>
         );
@@ -77,8 +76,12 @@ const StudyMode = () => {
     return (
         <div className="max-w-4xl mx-auto px-4 py-12">
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-900">{set.topic}</h1>
-                <p className="text-gray-500">
+                <div className="flex items-center space-x-3 mb-2">
+                    <span className="text-2xl">⚡</span>
+                    <h1 className="text-2xl font-bold text-gray-900">{set.topic}</h1>
+                </div>
+                <p className="text-gray-500 flex items-center">
+                    <span className="mr-2">🃏</span>
                     Card {currentIndex + 1} of {set.cards.length}
                 </p>
             </div>
@@ -96,29 +99,29 @@ const StudyMode = () => {
                 <button
                     onClick={handlePrevious}
                     disabled={currentIndex === 0}
-                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Previous
+                    ← Previous
                 </button>
                 <button
                     onClick={handleFlip}
-                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all transform hover:scale-[1.02]"
                 >
-                    Flip Card
+                    🔄 Flip Card
                 </button>
                 <button
                     onClick={handleNext}
                     disabled={currentIndex === set.cards.length - 1}
-                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    Next
+                    Next →
                 </button>
             </div>
 
             <div className="mt-8 text-center">
                 <button
                     onClick={() => navigate('/sets')}
-                    className="text-indigo-600 hover:text-indigo-800 font-medium"
+                    className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
                 >
                     ← Back to my sets
                 </button>

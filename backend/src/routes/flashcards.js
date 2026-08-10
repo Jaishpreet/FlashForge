@@ -71,7 +71,7 @@ router.post('/generate', auth, async (req, res) => {
         await flashcardSet.save();
 
         res.status(201).json({
-            message: 'Flashcards generated successfully',
+            message: '✨ Flashcards generated successfully',
             setId: flashcardSet._id,
             cards: flashcardSet.cards,
             topic: flashcardSet.topic
@@ -93,7 +93,7 @@ router.post('/generate', auth, async (req, res) => {
         await flashcardSet.save();
 
         res.status(201).json({
-            message: 'Flashcards generated with fallback method',
+            message: '🔄 Flashcards generated with fallback method',
             setId: flashcardSet._id,
             cards: flashcardSet.cards,
             topic: flashcardSet.topic

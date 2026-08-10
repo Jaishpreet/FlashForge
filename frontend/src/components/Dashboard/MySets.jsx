@@ -38,7 +38,13 @@ const MySets = () => {
             setSets(sets.filter(set => set.id !== id));
             toast.success(`"${topic}" deleted successfully!`);
         } catch (error) {
-            toast.error('Failed to delete flashcard set');
+            console.error('Delete error:', error);
+            if (error.response?.status === 404) {
+                toast.error('Set not found. Refreshing list...');
+                fetchSets();
+            } else {
+                toast.error(error.response?.data?.error || 'Failed to delete flashcard set');
+            }
         } finally {
             setDeletingId(null);
         }

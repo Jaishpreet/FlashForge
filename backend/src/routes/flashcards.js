@@ -5,7 +5,9 @@ import { auth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Generate flashcards - tries Hugging Face first, falls back to smart generation
+// ============================================================
+// 1. GENERATE FLASHCARDS
+// ============================================================
 router.post('/generate', auth, async (req, res) => {
     try {
         const { text, topic } = req.body;
@@ -53,7 +55,6 @@ router.post('/generate', auth, async (req, res) => {
 
         } catch (aiError) {
             console.log('❌ AI failed, using smart fallback:', aiError.message);
-            // Fall through to smart generation
         }
 
         // === SMART FALLBACK (No API needed) ===
@@ -92,9 +93,7 @@ router.post('/generate', auth, async (req, res) => {
     } catch (error) {
         console.error('❌ Fatal error:', error.message);
         
-        // ULTIMATE FALLBACK
         const fallbackCards = generateSmartFlashcards(req.body.text);
-        
         const flashcardSet = new FlashcardSet({
             userId: req.userId,
             topic: req.body.topic || 'Untitled Set',
@@ -113,7 +112,9 @@ router.post('/generate', auth, async (req, res) => {
     }
 });
 
-// === PARSE AI RESPONSE ===
+// ============================================================
+// HELPER: Parse AI Response
+// ============================================================
 function parseFlashcards(text) {
     const cards = [];
     const lines = text.split('\n');
@@ -152,50 +153,35 @@ function parseFlashcards(text) {
     return cards;
 }
 
-// === SMART FALLBACK (NO API) ===
+// ============================================================
+// HELPER: Smart Fallback (No API)
+// ============================================================
 function generateSmartFlashcards(text) {
     const cards = [];
-    
-    // Clean text
     const cleanText = text.replace(/\s+/g, ' ').trim();
-    
-    // Split into sentences
     const sentences = cleanText.match(/[^.!?]+[.!?]+/g) || [cleanText];
-    
-    // Remove very short sentences
     const meaningfulSentences = sentences.filter(s => s.trim().length > 20);
     
-    // Create flashcards from pairs of sentences
     for (let i = 0; i < Math.min(meaningfulSentences.length - 1, 10); i += 1) {
         const sentence = meaningfulSentences[i].trim();
         const nextSentence = meaningfulSentences[i + 1]?.trim() || '';
         
-        // Skip if sentence is too short
         if (sentence.length < 15) continue;
         
-        // Create question from the sentence
         let question = sentence;
         let answer = nextSentence || 'The text continues with more details.';
         
-        // Make it a proper question
         if (!question.endsWith('?')) {
-            // Try to convert to a question
-            const firstWords = question.split(' ').slice(0, 4).join(' ');
             question = `What is the meaning of: "${question}"?`;
         }
         
-        // If answer is too short, use next 2 sentences
         if (answer.length < 20 && i + 2 < meaningfulSentences.length) {
             answer = meaningfulSentences.slice(i + 1, i + 3).join(' ');
         }
         
-        cards.push({
-            question: question,
-            answer: answer
-        });
+        cards.push({ question, answer });
     }
     
-    // If we have too few cards, create more from chunks
     if (cards.length < 5) {
         const chunks = splitIntoChunks(cleanText, 3);
         for (const chunk of chunks) {
@@ -214,7 +200,6 @@ function generateSmartFlashcards(text) {
     return cards;
 }
 
-// === SPLIT TEXT INTO CHUNKS ===
 function splitIntoChunks(text, chunkSize = 3) {
     const words = text.split(' ');
     const chunks = [];
@@ -224,7 +209,9 @@ function splitIntoChunks(text, chunkSize = 3) {
     return chunks;
 }
 
-// === GET /api/flashcards ===
+// ============================================================
+// 2. GET ALL SETS - /api/flashcards
+// ============================================================
 router.get('/', auth, async (req, res) => {
     try {
         const sets = await FlashcardSet.find({ userId: req.userId })
@@ -245,7 +232,9 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
-// === GET /api/flashcards/:id ===
+// ============================================================
+// 3. GET ONE SET - /api/flashcards/:id
+// ============================================================
 router.get('/:id', auth, async (req, res) => {
     try {
         const set = await FlashcardSet.findOne({ 
@@ -263,7 +252,9 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
-// === PATCH /api/flashcards/:id/study ===
+// ============================================================
+// 4. UPDATE STUDY PROGRESS - /api/flashcards/:id/study
+// ============================================================
 router.patch('/:id/study', auth, async (req, res) => {
     try {
         const set = await FlashcardSet.findOneAndUpdate(
@@ -285,24 +276,38 @@ router.patch('/:id/study', auth, async (req, res) => {
     }
 });
 
-// DELETE /api/flashcards/:id - Delete a flashcard set
+// ============================================================
+// 5. DELETE A SET - /api/flashcards/:id  ✅ THIS IS YOUR DELETE ROUTE
+// ============================================================
 router.delete('/:id', auth, async (req, res) => {
     try {
-        const set = await FlashcardSet.findOneAndDelete({ 
+        console.log(`🗑️ Attempting to delete set with ID: ${req.params.id}`);
+        console.log(`👤 User ID: ${req.userId}`);
+        
+        const deletedSet = await FlashcardSet.findOneAndDelete({ 
             _id: req.params.id, 
             userId: req.userId 
         });
 
-        if (!set) {
-            return res.status(404).json({ error: 'Flashcard set not found' });
+        if (!deletedSet) {
+            console.log(`❌ Set not found or doesn't belong to user`);
+            return res.status(404).json({ 
+                error: 'Flashcard set not found or you don\'t have permission to delete it' 
+            });
         }
 
+        console.log(`✅ Successfully deleted set: ${deletedSet.topic}`);
         res.json({ 
             message: 'Flashcard set deleted successfully',
-            id: req.params.id 
+            id: req.params.id,
+            topic: deletedSet.topic
         });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('❌ Delete error:', error.message);
+        res.status(500).json({ 
+            error: 'Failed to delete flashcard set',
+            details: error.message 
+        });
     }
 });
 

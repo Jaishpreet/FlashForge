@@ -14,74 +14,100 @@ router.post('/generate', auth, async (req, res) => {
             return res.status(400).json({ error: 'Text content is required' });
         }
 
-        // Prepare prompt for AI
-        const prompt = `Generate 8-10 flashcards from this study material. 
-        Each flashcard must have a question and answer.
-        Format each as: Q: question? A: answer.
-        
-        Study Material:
-        ${text.substring(0, 1500)}
-        
-        Generate flashcards:`;
+        let cards = [];
 
-        // Call Hugging Face API (FREE)
-        const response = await axios.post(
-            `https://api-inference.huggingface.co/models/google/flan-t5-base`,
-            {
-                inputs: prompt,
-                parameters: {
-                    max_length: 800,
-                    temperature: 0.7,
-                    do_sample: true
+        try {
+            // === STEP 1: Try Hugging Face API ===
+            const prompt = `You are a study assistant. Create 8-10 flashcards from the text below.
+            Each flashcard must have a clear QUESTION and a clear ANSWER.
+            Format EXACTLY like this:
+            
+            Q: What is photosynthesis?
+            A: The process by which plants convert light energy into chemical energy.
+            
+            Q: What is the Calvin cycle?
+            A: The light-independent reactions of photosynthesis where CO2 is fixed into glucose.
+            
+            Text to create flashcards from:
+            ${text.substring(0, 2000)}
+            
+            Now create 8-10 flashcards following the exact Q: / A: format above.`;
+
+            console.log('📤 Sending request to Hugging Face...');
+
+            const response = await axios.post(
+                `https://api-inference.huggingface.co/models/google/flan-t5-base`,
+                {
+                    inputs: prompt,
+                    parameters: {
+                        max_length: 800,
+                        temperature: 0.5,
+                        do_sample: true,
+                        num_return_sequences: 1
+                    }
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`
+                    },
+                    timeout: 45000 // 45 second timeout
                 }
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`
-                }
-            }
-        );
+            );
 
-        // Parse AI response
-        const generatedText = response.data[0]?.generated_text || '';
-        let cards = parseFlashcards(generatedText);
+            console.log('✅ Hugging Face response received');
 
-        // If parsing fails or not enough cards, use fallback
-        if (cards.length < 5) {
-            cards = generateFallbackCards(text);
+            // Parse the response
+            const generatedText = response.data[0]?.generated_text || '';
+            cards = parseFlashcards(generatedText);
+
+            console.log(`📊 Parsed ${cards.length} cards from AI response`);
+
+        } catch (aiError) {
+            console.error('❌ AI Error:', aiError.message);
+            // Fallback to intelligent extraction
+            cards = generateSmartFlashcards(req.body.text);
+            console.log(`📊 Generated ${cards.length} cards using fallback`);
         }
 
-        // Ensure we have 8-10 cards
+        // === STEP 2: Ensure we have enough cards ===
+        if (cards.length < 5) {
+            console.log('⚠️ Not enough cards, using fallback...');
+            cards = generateSmartFlashcards(req.body.text);
+        }
+
+        // === STEP 3: Ensure exactly 8-10 cards ===
         while (cards.length < 8) {
             cards.push({
-                question: `What is a key concept from: "${text.substring(0, 30)}..."?`,
-                answer: text.substring(30, 100) + '...'
+                question: `What is the main idea of "${req.body.text.substring(0, 50)}..."?`,
+                answer: req.body.text.substring(50, 150) + '...'
             });
         }
         cards = cards.slice(0, 10);
 
-        // Save to database (EXACTLY as you requested)
+        // === STEP 4: Save to database ===
         const flashcardSet = new FlashcardSet({
             userId: req.userId,
             topic: topic || 'Untitled Set',
-            sourceText: text,
+            sourceText: req.body.text,
             cards: cards
         });
 
         await flashcardSet.save();
 
+        console.log(`💾 Saved ${cards.length} cards to database`);
+
         res.status(201).json({
-            message: '✨ Flashcards generated successfully',
+            message: cards.length >= 8 ? '✨ Flashcards generated successfully!' : '📝 Flashcards generated with fallback method',
             setId: flashcardSet._id,
             cards: flashcardSet.cards,
             topic: flashcardSet.topic
         });
 
     } catch (error) {
-        console.error('Error generating flashcards:', error.message);
+        console.error('❌ Fatal error:', error.message);
         
-        // Fallback: Generate basic flashcards without AI
-        const fallbackCards = generateFallbackCards(req.body.text);
+        // Ultimate fallback
+        const fallbackCards = generateSmartFlashcards(req.body.text);
         
         const flashcardSet = new FlashcardSet({
             userId: req.userId,
@@ -101,64 +127,110 @@ router.post('/generate', auth, async (req, res) => {
     }
 });
 
-// Helper: Parse AI response into flashcards
+// === HELPER: Parse AI response into flashcards ===
 function parseFlashcards(text) {
     const cards = [];
     const lines = text.split('\n');
     
+    let currentQuestion = '';
+    let currentAnswer = '';
+    let readingQuestion = false;
+    let readingAnswer = false;
+
     for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.includes('Q:') && trimmed.includes('A:')) {
-            const qMatch = trimmed.match(/Q:\s*(.*?)\s*A:/);
-            const aMatch = trimmed.match(/A:\s*(.*)/);
-            
-            if (qMatch && aMatch) {
+        
+        if (trimmed.startsWith('Q:') || trimmed.startsWith('Q:')) {
+            // Save previous card if exists
+            if (currentQuestion && currentAnswer) {
                 cards.push({
-                    question: qMatch[1].trim(),
-                    answer: aMatch[1].trim()
+                    question: currentQuestion.trim(),
+                    answer: currentAnswer.trim()
                 });
+            }
+            currentQuestion = trimmed.replace(/^Q:\s*/, '').trim();
+            currentAnswer = '';
+            readingQuestion = true;
+            readingAnswer = false;
+        } else if (trimmed.startsWith('A:') || trimmed.startsWith('A:')) {
+            currentAnswer = trimmed.replace(/^A:\s*/, '').trim();
+            readingQuestion = false;
+            readingAnswer = true;
+        } else if (readingQuestion && !trimmed.startsWith('A:')) {
+            // Continue building question
+            if (trimmed && !trimmed.match(/^\d+\./)) {
+                currentQuestion += ' ' + trimmed;
+            }
+        } else if (readingAnswer && trimmed) {
+            // Continue building answer
+            if (trimmed && !trimmed.match(/^\d+\./)) {
+                currentAnswer += ' ' + trimmed;
             }
         }
     }
+
+    // Save last card
+    if (currentQuestion && currentAnswer) {
+        cards.push({
+            question: currentQuestion.trim(),
+            answer: currentAnswer.trim()
+        });
+    }
+
     return cards;
 }
 
-// Fallback: Generate flashcards from text (no AI needed)
-function generateFallbackCards(text) {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
+// === HELPER: Smart fallback (no AI needed) ===
+function generateSmartFlashcards(text) {
     const cards = [];
     
-    for (let i = 0; i < Math.min(sentences.length, 10); i++) {
-        const sentence = sentences[i].trim();
-        if (sentence.length > 10) {
-            const words = sentence.split(' ');
-            const midPoint = Math.floor(words.length / 2);
-            const firstPart = words.slice(0, midPoint).join(' ');
-            const secondPart = words.slice(midPoint).join(' ');
+    // Split text into sentences
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+    
+    // Group sentences into chunks of 2-3
+    const chunks = [];
+    for (let i = 0; i < sentences.length; i += 2) {
+        const chunk = sentences.slice(i, i + 2).join(' ');
+        if (chunk.trim().length > 20) {
+            chunks.push(chunk.trim());
+        }
+    }
+
+    // Generate flashcards from chunks
+    for (let i = 0; i < Math.min(chunks.length, 10); i++) {
+        const chunk = chunks[i];
+        if (chunk.length > 30) {
+            // Split the chunk into two parts
+            const midPoint = Math.floor(chunk.length / 2);
+            const firstPart = chunk.substring(0, midPoint);
+            const secondPart = chunk.substring(midPoint);
             
+            // Create question and answer
+            const question = `What does "${firstPart.trim()}" refer to?`;
+            const answer = secondPart.trim();
+            
+            cards.push({ question, answer });
+        }
+    }
+
+    // If no cards generated, create generic ones
+    if (cards.length === 0) {
+        const words = text.split(' ');
+        for (let i = 0; i < Math.min(8, Math.floor(words.length / 5)); i++) {
+            const start = i * 5;
+            const end = Math.min(start + 5, words.length);
+            const phrase = words.slice(start, end).join(' ');
             cards.push({
-                question: `Explain the meaning of: "${firstPart}"?`,
-                answer: secondPart || 'Continue reading the material for the full context.'
+                question: `What is the meaning of "${phrase}"?`,
+                answer: `This phrase relates to: ${text.substring(0, 100)}...`
             });
         }
     }
-    
-    // If still no cards, add generic ones
-    if (cards.length === 0) {
-        cards.push({
-            question: `What is the main topic of this text?`,
-            answer: text.substring(0, 100) + '...'
-        });
-        cards.push({
-            question: `What is a key concept mentioned?`,
-            answer: `The text discusses ${text.split(' ').slice(0, 10).join(' ')}...`
-        });
-    }
-    
+
     return cards;
 }
 
-// GET /api/flashcards - List user's saved sets
+// === GET /api/flashcards - List user's saved sets ===
 router.get('/', auth, async (req, res) => {
     try {
         const sets = await FlashcardSet.find({ userId: req.userId })
@@ -179,7 +251,7 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
-// GET /api/flashcards/:id - Get one full set for studying
+// === GET /api/flashcards/:id - Get one full set for studying ===
 router.get('/:id', auth, async (req, res) => {
     try {
         const set = await FlashcardSet.findOne({ 
@@ -197,7 +269,7 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
-// PATCH /api/flashcards/:id/study - Update study progress
+// === PATCH /api/flashcards/:id/study - Update study progress ===
 router.patch('/:id/study', auth, async (req, res) => {
     try {
         const set = await FlashcardSet.findOneAndUpdate(

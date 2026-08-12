@@ -1,12 +1,14 @@
 import express from 'express';
-import axios from 'axios';
 import FlashcardSet from '../models/FlashcardSet.js';
 import { auth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Generate flashcards using Google Colab AI
-router.post('/generate-colab', auth, async (req, res) => {
+// ============================================================
+// GENERATE FLASHCARDS - NO API, JUST SMART TEXT PROCESSING
+// ============================================================
+
+router.post('/generate', auth, async (req, res) => {
     try {
         const { text, topic } = req.body;
 
@@ -14,31 +16,12 @@ router.post('/generate-colab', auth, async (req, res) => {
             return res.status(400).json({ error: 'Text content is required' });
         }
 
-        console.log('📤 Sending request to Colab AI...');
-        console.log('📌 Colab URL:', process.env.COLAB_AI_URL);
+        console.log('📝 Generating flashcards from text...');
 
-        const response = await axios.post(
-            process.env.COLAB_AI_URL,
-            { text: text },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'ngrok-skip-browser-warning': 'true' // ✅ Skip ngrok warning
-                },
-                timeout: 60000
-            }
-        );
+        // Generate flashcards directly from text
+        let cards = generateSmartFlashcards(text);
 
-        console.log('✅ Colab AI response received');
-        const generatedText = response.data?.flashcards || '';
-        let cards = parseFlashcards(generatedText);
-
-        if (cards.length < 5) {
-            console.log('📝 Using fallback...');
-            cards = generateSmartFlashcards(text);
-        }
-
-        // Ensure 8-10 cards
+        // Ensure we have 8-10 cards
         while (cards.length < 8) {
             cards.push({
                 question: `What is discussed in "${text.substring(0, 40)}..."?`,
@@ -58,207 +41,22 @@ router.post('/generate-colab', auth, async (req, res) => {
         await flashcardSet.save();
 
         res.status(201).json({
-            message: '✨ Flashcards generated with Colab AI!',
+            message: '📝 Flashcards generated successfully!',
             setId: flashcardSet._id,
             cards: flashcardSet.cards,
             topic: flashcardSet.topic
         });
 
     } catch (error) {
-        console.error('❌ Colab AI error:', error.message);
-        if (error.response) {
-            console.error('Response data:', error.response.data);
-            console.error('Response status:', error.response.status);
-        }
-        
-        // Fallback
-        const fallbackCards = generateSmartFlashcards(req.body.text);
-        const flashcardSet = new FlashcardSet({
-            userId: req.userId,
-            topic: req.body.topic || 'Untitled Set',
-            sourceText: req.body.text,
-            cards: fallbackCards
-        });
-
-        await flashcardSet.save();
-
-        res.status(201).json({
-            message: '🔄 Flashcards generated with fallback method',
-            setId: flashcardSet._id,
-            cards: flashcardSet.cards,
-            topic: flashcardSet.topic
-        });
+        console.error('❌ Error:', error.message);
+        res.status(500).json({ error: error.message });
     }
 });
 
-// Generate flashcards using OpenRouter (FREE)
-router.post('/generate', auth, async (req, res) => {
-    try {
-        const { text, topic } = req.body;
+// ============================================================
+// SMART FLASHCARD GENERATION (NO API)
+// ============================================================
 
-        if (!text || text.trim().length === 0) {
-            return res.status(400).json({ error: 'Text content is required' });
-        }
-
-        let cards = [];
-        let usedAI = false;
-
-        // === TRY OPENROUTER API ===
-        try {
-            console.log('📤 Attempting OpenRouter API...');
-            
-            const prompt = `Create 8-10 flashcards from this study material.
-Each flashcard must have a clear QUESTION and a clear ANSWER.
-Format EXACTLY like this for each card:
-
-Q: What is photosynthesis?
-A: The process by which plants convert light energy into chemical energy.
-
-Q: What is the Calvin cycle?
-A: The light-independent reactions of photosynthesis where CO2 is fixed into glucose.
-
-Text to create flashcards from:
-${text.substring(0, 2000)}
-
-Now create 8-10 flashcards following the exact Q: / A: format above.`;
-
-            const response = await axios.post(
-                'https://openrouter.ai/api/v1/chat/completions',
-                {
-                    model: 'meta-llama/llama-4-scout:free', // Free model
-                    messages: [
-                        {
-                            role: 'system',
-                            content: 'You are a study assistant that creates high-quality flashcards. Always respond in Q: / A: format only.'
-                        },
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    temperature: 0.5,
-                    max_tokens: 800
-                },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                        'Content-Type': 'application/json',
-                        'HTTP-Referer': 'https://flash-forge-769x.vercel.app',
-                        'X-Title': 'FlashForge'
-                    },
-                    timeout: 45000
-                }
-            );
-
-            console.log('✅ OpenRouter response received');
-
-            const generatedText = response.data?.choices?.[0]?.message?.content || '';
-            cards = parseFlashcards(generatedText);
-            usedAI = true;
-            console.log(`📊 AI generated ${cards.length} cards`);
-
-        } catch (aiError) {
-            console.log('❌ OpenRouter failed, using smart fallback:', aiError.message);
-            // Fall through to smart generation
-        }
-
-        // === SMART FALLBACK (No API needed) ===
-        if (cards.length < 5) {
-            console.log('📝 Generating smart flashcards from text...');
-            cards = generateSmartFlashcards(text);
-            usedAI = false;
-        }
-
-        // === ENSURE 8-10 CARDS ===
-        while (cards.length < 8) {
-            cards.push({
-                question: `What is discussed in "${text.substring(0, 40)}..."?`,
-                answer: text.substring(40, 140) + '...'
-            });
-        }
-        cards = cards.slice(0, 10);
-
-        // === SAVE TO DATABASE ===
-        const flashcardSet = new FlashcardSet({
-            userId: req.userId,
-            topic: topic || 'Untitled Set',
-            sourceText: text,
-            cards: cards
-        });
-
-        await flashcardSet.save();
-
-        res.status(201).json({
-            message: usedAI ? '✨ Flashcards generated with OpenRouter AI!' : '📝 Flashcards generated from your text',
-            setId: flashcardSet._id,
-            cards: flashcardSet.cards,
-            topic: flashcardSet.topic
-        });
-
-    } catch (error) {
-        console.error('❌ Fatal error:', error.message);
-        
-        // ULTIMATE FALLBACK
-        const fallbackCards = generateSmartFlashcards(req.body.text);
-        
-        const flashcardSet = new FlashcardSet({
-            userId: req.userId,
-            topic: req.body.topic || 'Untitled Set',
-            sourceText: req.body.text,
-            cards: fallbackCards
-        });
-
-        await flashcardSet.save();
-
-        res.status(201).json({
-            message: '🔄 Flashcards generated with fallback method',
-            setId: flashcardSet._id,
-            cards: flashcardSet.cards,
-            topic: flashcardSet.topic
-        });
-    }
-});
-
-// === PARSE AI RESPONSE ===
-function parseFlashcards(text) {
-    const cards = [];
-    const lines = text.split('\n');
-    
-    let currentQ = '';
-    let currentA = '';
-    let readingQ = false;
-    let readingA = false;
-
-    for (const line of lines) {
-        const trimmed = line.trim();
-        
-        if (trimmed.startsWith('Q:')) {
-            if (currentQ && currentA) {
-                cards.push({ question: currentQ.trim(), answer: currentA.trim() });
-            }
-            currentQ = trimmed.replace(/^Q:\s*/, '').trim();
-            currentA = '';
-            readingQ = true;
-            readingA = false;
-        } else if (trimmed.startsWith('A:')) {
-            currentA = trimmed.replace(/^A:\s*/, '').trim();
-            readingQ = false;
-            readingA = true;
-        } else if (readingQ && trimmed) {
-            currentQ += ' ' + trimmed;
-        } else if (readingA && trimmed) {
-            currentA += ' ' + trimmed;
-        }
-    }
-
-    if (currentQ && currentA) {
-        cards.push({ question: currentQ.trim(), answer: currentA.trim() });
-    }
-
-    return cards;
-}
-
-// === SMART FALLBACK ===
 function generateSmartFlashcards(text) {
     const cards = [];
     const cleanText = text.replace(/\s+/g, ' ').trim();
@@ -271,12 +69,8 @@ function generateSmartFlashcards(text) {
         
         if (sentence.length < 15) continue;
         
-        let question = sentence;
+        let question = `What is the meaning of: "${sentence}"?`;
         let answer = nextSentence || 'The text continues with more details.';
-        
-        if (!question.endsWith('?')) {
-            question = `What is the meaning of: "${question}"?`;
-        }
         
         if (answer.length < 20 && i + 2 < meaningfulSentences.length) {
             answer = meaningfulSentences.slice(i + 1, i + 3).join(' ');
@@ -312,7 +106,10 @@ function splitIntoChunks(text, chunkSize = 3) {
     return chunks;
 }
 
-// === GET /api/flashcards ===
+// ============================================================
+// GET ALL SETS
+// ============================================================
+
 router.get('/', auth, async (req, res) => {
     try {
         const sets = await FlashcardSet.find({ userId: req.userId })
@@ -333,7 +130,10 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
-// === GET /api/flashcards/:id ===
+// ============================================================
+// GET ONE SET
+// ============================================================
+
 router.get('/:id', auth, async (req, res) => {
     try {
         const set = await FlashcardSet.findOne({ 
@@ -351,7 +151,10 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
-// === PATCH /api/flashcards/:id/study ===
+// ============================================================
+// UPDATE STUDY PROGRESS
+// ============================================================
+
 router.patch('/:id/study', auth, async (req, res) => {
     try {
         const set = await FlashcardSet.findOneAndUpdate(
@@ -373,7 +176,10 @@ router.patch('/:id/study', auth, async (req, res) => {
     }
 });
 
-// === DELETE /api/flashcards/:id ===
+// ============================================================
+// DELETE A SET
+// ============================================================
+
 router.delete('/:id', auth, async (req, res) => {
     try {
         console.log(`🗑️ Attempting to delete set with ID: ${req.params.id}`);

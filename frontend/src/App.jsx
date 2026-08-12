@@ -7,6 +7,7 @@ import Signup from './components/Auth/Signup';
 import HabitsPage from './components/Dashboard/HabitsPage';
 import Analytics from './components/Dashboard/Analytics';
 import Goals from './components/Dashboard/Goals';
+import Settings from './components/Dashboard/Settings';  // ✅ ADD THIS IMPORT
 import Navbar from './components/Common/Navbar';
 
 const PrivateRoute = ({ children }) => {
@@ -57,6 +58,12 @@ function AppContent() {
                 <Route path="/goals" element={
                     <PrivateRoute>
                         <Goals />
+                    </PrivateRoute>
+                } />
+                {/* ✅ ADD THIS SETTINGS ROUTE - Put it after Goals */}
+                <Route path="/settings" element={
+                    <PrivateRoute>
+                        <Settings />
                     </PrivateRoute>
                 } />
             </Routes>

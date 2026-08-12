@@ -14,11 +14,9 @@ router.get('/', auth, async (req, res) => {
         const habits = await Habit.find({ userId: req.userId })
             .sort({ createdAt: -1 });
         
-        // Get today's date
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        // Check completion for today for each habit
         const habitsWithStatus = await Promise.all(habits.map(async (habit) => {
             const log = await HabitLog.findOne({
                 habitId: habit._id,
@@ -90,7 +88,7 @@ router.delete('/:id', auth, async (req, res) => {
 
 router.post('/:id/log', auth, async (req, res) => {
     try {
-        const { completed, date } = req.body; // ✅ Added 'date' here
+        const { completed, date } = req.body;
 
         const habit = await Habit.findOne({
             _id: req.params.id,
@@ -101,7 +99,6 @@ router.post('/:id/log', auth, async (req, res) => {
             return res.status(404).json({ error: 'Habit not found' });
         }
 
-        // ✅ Use provided date or default to today
         let logDate = date ? new Date(date) : new Date();
         logDate.setHours(0, 0, 0, 0);
 
@@ -190,6 +187,37 @@ router.get('/:id/history', auth, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
+// ============================================================
+// EXPORT ALL HABIT DATA (CSV)
+// ============================================================
+
+router.get('/export', auth, async (req, res) => {
+    try {
+        const habits = await Habit.find({ userId: req.userId });
+        const logs = await HabitLog.find({ userId: req.userId }).sort({ date: 1 });
+
+        const exportData = [];
+        for (const log of logs) {
+            const habit = habits.find(h => h._id.toString() === log.habitId.toString());
+            if (habit) {
+                exportData.push({
+                    habitName: habit.name,
+                    date: log.date.toISOString().split('T')[0],
+                    completed: log.completed
+                });
+            }
+        }
+
+        res.json(exportData);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
 
 function calculateStreak(dates) {
     let streak = 0;

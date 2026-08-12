@@ -78,4 +78,63 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// ============================================================
+// UPDATE USERNAME
+// ============================================================
+
+router.put('/update-username', auth, async (req, res) => {
+    try {
+        const { username } = req.body;
+
+        if (!username || username.trim().length < 3) {
+            return res.status(400).json({ error: 'Username must be at least 3 characters' });
+        }
+
+        // Check if username is taken
+        const existingUser = await User.findOne({ 
+            username: username.trim(),
+            _id: { $ne: req.userId }
+        });
+
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username already taken' });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.userId,
+            { username: username.trim() },
+            { new: true }
+        ).select('-password');
+
+        res.json({ 
+            message: 'Username updated successfully',
+            user: user
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================
+// DELETE ACCOUNT
+// ============================================================
+
+router.delete('/delete-account', auth, async (req, res) => {
+    try {
+        // Delete user
+        await User.findByIdAndDelete(req.userId);
+        
+        // Delete all habits and logs for this user
+        const habits = await Habit.find({ userId: req.userId });
+        for (const habit of habits) {
+            await HabitLog.deleteMany({ habitId: habit._id });
+        }
+        await Habit.deleteMany({ userId: req.userId });
+
+        res.json({ message: 'Account deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 export default router;

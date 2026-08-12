@@ -92,7 +92,7 @@ const HabitsPage = () => {
         <div className="max-w-6xl mx-auto px-4 py-12">
             <div className="flex items-center gap-3 mb-8">
                 <span className="text-3xl">✅</span>
-                <h1 className="text-3xl font-bold text-gray-900">Daily Habit Tracker</h1>
+                <h1 className="text-3xl font-bold text-gray-900">HabitFlow</h1>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

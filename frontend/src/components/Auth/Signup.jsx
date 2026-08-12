@@ -43,7 +43,7 @@ const Signup = () => {
             });
             const { user, token } = response.data;
             login(user, token);
-            toast.success('Welcome to FlashForge! 🚀');
+            toast.success('Welcome to HabitFlow! 🚀');
             navigate('/');
         } catch (error) {
             toast.error(error.response?.data?.error || 'Signup failed');
@@ -58,7 +58,7 @@ const Signup = () => {
                 <div className="text-center">
                     <div className="flex justify-center items-center space-x-2 mb-4">
                         <span className="text-4xl">⚡</span>
-                        <span className="text-3xl font-bold text-gray-900">FlashForge</span>
+                        <span className="text-3xl font-bold text-gray-900">HabitFlow</span>
                     </div>
                     <h2 className="text-2xl font-extrabold text-gray-900">
                         Create Account

@@ -18,7 +18,7 @@ const Navbar = () => {
                     <div className="flex items-center">
                         <Link to="/" className="flex items-center space-x-2">
                             <span className="text-2xl">✅</span>
-                            <span className="text-xl font-bold text-gray-900">HabitTracker</span>
+                            <span className="text-xl font-bold text-gray-900">HabitFlow</span>
                         </Link>
                         {user && (
                             <div className="ml-10 flex space-x-8">

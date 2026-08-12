@@ -23,7 +23,7 @@ const Login = () => {
             const response = await axios.post(`${API_URL}/auth/login`, formData);
             const { user, token } = response.data;
             login(user, token);
-            toast.success('Welcome back to FlashForge! 🚀');
+            toast.success('Welcome back to HabitFlow! 🚀');
             navigate('/');
         } catch (error) {
             toast.error(error.response?.data?.error || 'Login failed');
@@ -38,7 +38,7 @@ const Login = () => {
                 <div className="text-center">
                     <div className="flex justify-center items-center space-x-2 mb-4">
                         <span className="text-4xl">⚡</span>
-                        <span className="text-3xl font-bold text-gray-900">FlashForge</span>
+                        <span className="text-3xl font-bold text-gray-900">HabitFlow</span>
                     </div>
                     <h2 className="text-2xl font-extrabold text-gray-900">
                         Welcome Back!

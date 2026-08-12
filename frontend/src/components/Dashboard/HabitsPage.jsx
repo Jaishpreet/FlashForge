@@ -2,60 +2,191 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { API_URL } from '../../config';
-import { 
-    StreakCounter, 
-    DailyProgress, 
-    MotivationalQuote, 
-    WeeklySummary 
-} from './HabitStats';
+import { useAuth } from '../../context/AuthContext';
+
+// ============================================================
+// STAT CARDS
+// ============================================================
+
+const StatCard = ({ icon, label, value, subtext, color }) => (
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+        <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center flex-shrink-0`}>
+                <span className="text-xl">{icon}</span>
+            </div>
+            <div className="min-w-0">
+                <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
+                <p className="text-xl font-bold text-gray-900">{value}</p>
+                {subtext && <p className="text-xs text-gray-400 truncate">{subtext}</p>}
+            </div>
+        </div>
+    </div>
+);
+
+// ============================================================
+// MONTHLY CALENDAR COMPONENT
+// ============================================================
+
+const MonthlyCalendar = ({ history }) => {
+    const [currentMonth, setCurrentMonth] = useState(new Date());
+    
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    // Create map of completed dates
+    const completedDates = {};
+    if (history) {
+        history.forEach(day => {
+            if (day.completed) {
+                completedDates[day.date] = true;
+            }
+        });
+    }
+    
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Calculate stats for this month
+    let completedCount = 0;
+    let totalDays = 0;
+    const today = new Date();
+    
+    for (let i = 0; i < daysInMonth; i++) {
+        const date = new Date(year, month, i + 1);
+        const dateStr = date.toISOString().split('T')[0];
+        // Don't count future days
+        if (date > today) continue;
+        totalDays++;
+        if (completedDates[dateStr]) completedCount++;
+    }
+    
+    const monthProgress = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
+
+    return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">
+                    📅 {monthNames[month]} {year}
+                </h3>
+                <div className="flex gap-1">
+                    <button
+                        onClick={() => setCurrentMonth(new Date(year, month - 1, 1))}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    >
+                        ←
+                    </button>
+                    <button
+                        onClick={() => setCurrentMonth(new Date())}
+                        className="px-2 py-1 text-xs text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                    >
+                        Today
+                    </button>
+                    <button
+                        onClick={() => setCurrentMonth(new Date(year, month + 1, 1))}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    >
+                        →
+                    </button>
+                </div>
+            </div>
+            
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-1 mb-1">
+                {days.map(d => (
+                    <div key={d} className="text-center text-[10px] font-medium text-gray-400">
+                        {d}
+                    </div>
+                ))}
+            </div>
+            
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-1">
+                {/* Empty cells for days before month starts */}
+                {Array.from({ length: firstDay }).map((_, i) => (
+                    <div key={`empty-${i}`} className="aspect-square"></div>
+                ))}
+                
+                {/* Days of the month */}
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const day = i + 1;
+                    const date = new Date(year, month, day);
+                    const dateStr = date.toISOString().split('T')[0];
+                    const isToday = date.toDateString() === new Date().toDateString();
+                    const isCompleted = completedDates[dateStr] || false;
+                    const isFuture = date > new Date();
+                    
+                    return (
+                        <div
+                            key={day}
+                            className={`aspect-square flex items-center justify-center text-sm rounded-lg transition-colors ${
+                                isFuture 
+                                    ? 'text-gray-200' 
+                                    : isCompleted 
+                                        ? 'bg-green-500 text-white' 
+                                        : 'bg-gray-50 text-gray-400'
+                            } ${isToday && !isFuture ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                            title={`${dateStr}: ${isCompleted ? '✅' : '❌'}`}
+                        >
+                            {day}
+                        </div>
+                    );
+                })}
+            </div>
+            
+            <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-sm bg-green-500"></div>
+                        <span className="text-xs text-gray-500">Done</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-sm bg-gray-50 border border-gray-200"></div>
+                        <span className="text-xs text-gray-500">Missed</span>
+                    </div>
+                </div>
+                <span className="text-xs font-medium text-gray-700">
+                    {completedCount}/{totalDays} days ({monthProgress}%)
+                </span>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
+// MAIN HABITS PAGE
+// ============================================================
 
 const HabitsPage = () => {
     const [habits, setHabits] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [history, setHistory] = useState([]);
+    const [showAddForm, setShowAddForm] = useState(false);
     const [newHabitName, setNewHabitName] = useState('');
     const [newHabitDesc, setNewHabitDesc] = useState('');
     const [toggling, setToggling] = useState(null);
+    const [history, setHistory] = useState([]);
+    const { user } = useAuth();
 
     useEffect(() => {
         fetchHabits();
-        fetchHistory();
     }, []);
 
     const fetchHabits = async () => {
         try {
             const response = await axios.get(`${API_URL}/habits`);
             setHabits(response.data);
+            // Get history for first habit
+            if (response.data.length > 0) {
+                const histRes = await axios.get(`${API_URL}/habits/${response.data[0]._id}/history`);
+                setHistory(histRes.data.history || []);
+            }
         } catch (error) {
             toast.error('Failed to load habits');
         } finally {
             setLoading(false);
         }
-    };
-
-    const fetchHistory = async () => {
-        try {
-            // Get history for first habit (or aggregate later)
-            if (habits.length > 0) {
-                const response = await axios.get(`${API_URL}/habits/${habits[0]._id}/history`);
-                setHistory(response.data.history || []);
-            }
-        } catch (error) {
-            // Silently fail
-        }
-    };
-
-    // Calculate streak (simplified)
-    const calculateStreak = () => {
-        let streak = 0;
-        for (let i = history.length - 1; i >= 0; i--) {
-            if (history[i].completed) {
-                streak++;
-            } else {
-                break;
-            }
-        }
-        return streak;
     };
 
     const createHabit = async (e) => {
@@ -73,6 +204,7 @@ const HabitsPage = () => {
             setHabits([response.data, ...habits]);
             setNewHabitName('');
             setNewHabitDesc('');
+            setShowAddForm(false);
             toast.success('Habit created! 💪');
         } catch (error) {
             toast.error(error.response?.data?.error || 'Failed to create habit');
@@ -90,7 +222,6 @@ const HabitsPage = () => {
                     ? { ...h, todayCompleted: !currentStatus }
                     : h
             ));
-            toast.success(currentStatus ? 'Unmarked!' : 'Done! ✅');
         } catch (error) {
             toast.error('Failed to update habit');
         } finally {
@@ -110,113 +241,182 @@ const HabitsPage = () => {
         }
     };
 
+    // Calculate stats
+    const completedToday = habits.filter(h => h.todayCompleted).length;
+    const totalHabits = habits.length;
+    const progress = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
+
+    // Calculate streak from history
+    const calculateStreak = () => {
+        let streak = 0;
+        for (let i = history.length - 1; i >= 0; i--) {
+            if (history[i].completed) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+        return streak;
+    };
+    const streak = calculateStreak();
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="text-gray-600">Loading your habits...</div>
+                <div className="text-gray-500">Loading habits...</div>
             </div>
         );
     }
 
-    const streak = calculateStreak();
-    const completedToday = habits.filter(h => h.todayCompleted).length;
-
     return (
-        <div className="max-w-6xl mx-auto px-4 py-12">
-            <div className="flex items-center gap-3 mb-8">
-                <span className="text-3xl">✅</span>
-                <h1 className="text-3xl font-bold text-gray-900">HabitForge</h1>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <StreakCounter streak={streak} />
-                <DailyProgress habits={habits} />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="md:col-span-2">
-                    <MotivationalQuote 
-                        completedCount={completedToday} 
-                        totalHabits={habits.length} 
-                    />
-                </div>
+        <div className="max-w-5xl mx-auto px-4 py-8">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-8">
                 <div>
-                    <WeeklySummary history={history} />
+                    <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                    <p className="text-sm text-gray-500">Track your daily habits</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600">👋 {user?.username}</span>
                 </div>
             </div>
 
-            {/* Add Habit Form */}
-            <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-gray-100">
-                <h2 className="text-lg font-semibold mb-4">Add New Habit</h2>
-                <form onSubmit={createHabit} className="space-y-3">
-                    <input
-                        type="text"
-                        value={newHabitName}
-                        onChange={(e) => setNewHabitName(e.target.value)}
-                        placeholder="e.g., Drink 3L water"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                    <input
-                        type="text"
-                        value={newHabitDesc}
-                        onChange={(e) => setNewHabitDesc(e.target.value)}
-                        placeholder="Optional description"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                    <button
-                        type="submit"
-                        className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                        Add Habit
-                    </button>
-                </form>
+            {/* Stats Grid - 4 Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <StatCard 
+                    icon="🔥" 
+                    label="Current Streak" 
+                    value={`${streak} days`}
+                    subtext={streak === 0 ? "Start today!" : "Keep going!"}
+                    color="bg-orange-50"
+                />
+                <StatCard 
+                    icon="📊" 
+                    label="Today's Progress" 
+                    value={`${progress}%`}
+                    subtext={`${completedToday}/${totalHabits} done`}
+                    color="bg-blue-50"
+                />
+                <StatCard 
+                    icon="🏆" 
+                    label="Best Streak" 
+                    value={`${streak} days`}
+                    subtext="Keep pushing!"
+                    color="bg-yellow-50"
+                />
+                <StatCard 
+                    icon="✅" 
+                    label="Total Habits" 
+                    value={`${totalHabits}`}
+                    subtext={totalHabits === 0 ? "Add your first!" : "Active habits"}
+                    color="bg-green-50"
+                />
             </div>
 
-            {/* Habit List */}
-            {habits.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                    <span className="text-6xl block mb-4">🌟</span>
-                    <p className="text-gray-600">No habits yet. Add your first one above!</p>
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    {habits.map((habit) => (
-                        <div
-                            key={habit._id}
-                            className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
-                        >
-                            <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                    <h3 className="font-semibold text-gray-900">{habit.name}</h3>
-                                    {habit.description && (
-                                        <p className="text-sm text-gray-500">{habit.description}</p>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => toggleHabit(habit._id, habit.todayCompleted)}
-                                        disabled={toggling === habit._id}
-                                        className={`px-4 py-2 rounded-lg transition-all ${
-                                            habit.todayCompleted
-                                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                    >
-                                        {habit.todayCompleted ? '✅ Done' : '⬜ Mark Done'}
-                                    </button>
-                                    <button
-                                        onClick={() => deleteHabit(habit._id)}
-                                        className="text-red-400 hover:text-red-600 transition-colors p-2"
-                                    >
-                                        🗑️
-                                    </button>
-                                </div>
-                            </div>
+            {/* Main Content */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Habits List */}
+                <div className="lg:col-span-2">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="flex justify-between items-center p-4 border-b border-gray-100">
+                            <h2 className="font-semibold text-gray-900">📋 Your Habits</h2>
+                            <button
+                                onClick={() => setShowAddForm(!showAddForm)}
+                                className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                            >
+                                {showAddForm ? 'Cancel' : '+ Add Habit'}
+                            </button>
                         </div>
-                    ))}
+
+                        {/* Add Habit Form */}
+                        {showAddForm && (
+                            <form onSubmit={createHabit} className="p-4 border-b border-gray-100 bg-gray-50">
+                                <div className="flex gap-3">
+                                    <div className="flex-1">
+                                        <input
+                                            type="text"
+                                            value={newHabitName}
+                                            onChange={(e) => setNewHabitName(e.target.value)}
+                                            placeholder="Habit name"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                                            autoFocus
+                                        />
+                                        <input
+                                            type="text"
+                                            value={newHabitDesc}
+                                            onChange={(e) => setNewHabitDesc(e.target.value)}
+                                            placeholder="Optional description"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm mt-2"
+                                        />
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium self-start"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
+                        {/* Habit List */}
+                        {habits.length === 0 ? (
+                            <div className="text-center py-12">
+                                <span className="text-4xl block mb-3">🌟</span>
+                                <p className="text-gray-500 text-sm">No habits yet</p>
+                                <p className="text-gray-400 text-xs">Click "Add Habit" to get started</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-100">
+                                {habits.map((habit) => (
+                                    <div key={habit._id} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-medium text-gray-900 text-sm truncate">
+                                                {habit.name}
+                                            </h3>
+                                            {habit.description && (
+                                                <p className="text-xs text-gray-400 truncate">{habit.description}</p>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <button
+                                                onClick={() => toggleHabit(habit._id, habit.todayCompleted)}
+                                                disabled={toggling === habit._id}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                                    habit.todayCompleted
+                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {habit.todayCompleted ? '✅ Done' : 'Mark Done'}
+                                            </button>
+                                            <button
+                                                onClick={() => deleteHabit(habit._id)}
+                                                className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                                            >
+                                                🗑️
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            )}
+
+                {/* Right Sidebar - Monthly Calendar */}
+                <div className="space-y-6">
+                    <MonthlyCalendar history={history} />
+                    
+                    {/* Quick Quote */}
+                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
+                        <p className="text-sm text-gray-700 italic">
+                            "Small daily improvements over time lead to stunning results."
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">— Robin Sharma</p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

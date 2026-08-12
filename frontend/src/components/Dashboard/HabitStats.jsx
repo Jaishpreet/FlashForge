@@ -1,32 +1,72 @@
 import React from 'react';
 
 // ============================================================
-// STREAK COUNTER
+// STREAK COUNTER - Professional Version
 // ============================================================
 
-export const StreakCounter = ({ streak }) => {
-    const fireSize = streak > 0 ? Math.min(30 + streak * 2, 70) : 20;
-    const getMessage = () => {
-        if (streak === 0) return "Start your streak today! 💪";
-        if (streak < 3) return "Keep going! You're building momentum! 🌱";
-        if (streak < 7) return "You're on fire! 🔥";
-        if (streak < 14) return "Amazing consistency! ⭐";
-        if (streak < 30) return "You're unstoppable! 🚀";
-        return "LEGENDARY! You're a habit master! 👑";
+export const StreakCounter = ({ streak, goal = 30 }) => {
+    const percentage = Math.min((streak / goal) * 100, 100);
+    const circumference = 2 * Math.PI * 36;
+    const offset = circumference - (percentage / 100) * circumference;
+    
+    const getStatus = () => {
+        if (streak === 0) return { label: "Start your streak", color: "text-gray-400" };
+        if (streak < 3) return { label: "Building momentum", color: "text-blue-500" };
+        if (streak < 7) return { label: "Getting consistent", color: "text-indigo-500" };
+        if (streak < 14) return { label: "Strong habit forming", color: "text-purple-500" };
+        if (streak < 30) return { label: "Unstoppable!", color: "text-orange-500" };
+        return { label: "🏆 HABIT MASTER", color: "text-green-600" };
     };
+    
+    const status = getStatus();
 
     return (
-        <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-6 border border-orange-100">
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-sm font-medium text-orange-600">Current Streak</p>
-                    <div className="flex items-end gap-2">
-                        <span className="text-4xl font-bold text-orange-700">{streak}</span>
-                        <span className="text-sm text-gray-500 mb-1">days</span>
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-6">
+                {/* Progress Ring */}
+                <div className="relative flex-shrink-0">
+                    <svg className="w-24 h-24 transform -rotate-90">
+                        <circle
+                            cx="48" cy="48" r="36"
+                            stroke="#e5e7eb"
+                            strokeWidth="6"
+                            fill="none"
+                        />
+                        <circle
+                            cx="48" cy="48" r="36"
+                            stroke={streak >= goal ? "#10b981" : "#6366f1"}
+                            strokeWidth="6"
+                            fill="none"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={offset}
+                            strokeLinecap="round"
+                            className="transition-all duration-1000"
+                        />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center flex-col">
+                        <span className="text-2xl font-bold text-gray-900">{streak}</span>
+                        <span className="text-[10px] text-gray-400 uppercase tracking-wider">Days</span>
                     </div>
-                    <p className="text-sm text-orange-600 mt-1">{getMessage()}</p>
                 </div>
-                <span style={{ fontSize: `${fireSize}px` }}>🔥</span>
+                
+                {/* Info */}
+                <div>
+                    <p className="text-sm font-medium text-gray-900">
+                        {streak === 0 ? "No streak yet" : `${streak}-Day Streak`}
+                    </p>
+                    <p className={`text-sm ${status.color}`}>
+                        {status.label}
+                    </p>
+                    {streak < goal ? (
+                        <p className="text-xs text-gray-400 mt-1">
+                            {goal - streak} more days to reach {goal} days
+                        </p>
+                    ) : (
+                        <p className="text-xs text-green-600 mt-1">
+                            🎯 Goal achieved! Keep going!
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     );

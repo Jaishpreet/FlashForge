@@ -270,15 +270,6 @@ const HabitsPage = () => {
 
     return (
         <div className="max-w-5xl mx-auto px-4 py-8">
-            {/* Header - Only share button, no duplicate text */}
-            <div className="flex justify-end mb-8">
-                <ShareButton
-                    habits={habits}
-                    history={history}
-                    streak={streak}
-                    progress={progress}
-                />
-            </div>
 
             {/* Stats Grid - 4 Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

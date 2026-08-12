@@ -17,8 +17,8 @@ const Navbar = () => {
                 <div className="flex justify-between h-16">
                     <div className="flex items-center">
                         <Link to="/" className="flex items-center space-x-2">
-                            <span className="text-2xl font-bold text-indigo-600">⚡</span>
-                            <span className="text-xl font-bold text-gray-900">FlashForge</span>
+                            <span className="text-2xl">✅</span>
+                            <span className="text-xl font-bold text-gray-900">HabitTracker</span>
                         </Link>
                         {user && (
                             <div className="ml-10 flex space-x-8">
@@ -26,13 +26,7 @@ const Navbar = () => {
                                     to="/"
                                     className="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                                 >
-                                    Generate
-                                </Link>
-                                <Link
-                                    to="/sets"
-                                    className="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                                >
-                                    My Sets
+                                    Dashboard
                                 </Link>
                             </div>
                         )}

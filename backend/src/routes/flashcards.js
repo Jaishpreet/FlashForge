@@ -5,6 +5,92 @@ import { auth } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Generate flashcards using Google Colab AI
+router.post('/generate-colab', auth, async (req, res) => {
+    try {
+        const { text, topic } = req.body;
+
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({ error: 'Text content is required' });
+        }
+
+        console.log('📤 Sending request to Colab AI...');
+        console.log('📌 Colab URL:', process.env.COLAB_AI_URL);
+
+        const response = await axios.post(
+            process.env.COLAB_AI_URL,
+            { text: text },
+            {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'ngrok-skip-browser-warning': 'true' // ✅ Skip ngrok warning
+                },
+                timeout: 60000
+            }
+        );
+
+        console.log('✅ Colab AI response received');
+        const generatedText = response.data?.flashcards || '';
+        let cards = parseFlashcards(generatedText);
+
+        if (cards.length < 5) {
+            console.log('📝 Using fallback...');
+            cards = generateSmartFlashcards(text);
+        }
+
+        // Ensure 8-10 cards
+        while (cards.length < 8) {
+            cards.push({
+                question: `What is discussed in "${text.substring(0, 40)}..."?`,
+                answer: text.substring(40, 140) + '...'
+            });
+        }
+        cards = cards.slice(0, 10);
+
+        // Save to database
+        const flashcardSet = new FlashcardSet({
+            userId: req.userId,
+            topic: topic || 'Untitled Set',
+            sourceText: text,
+            cards: cards
+        });
+
+        await flashcardSet.save();
+
+        res.status(201).json({
+            message: '✨ Flashcards generated with Colab AI!',
+            setId: flashcardSet._id,
+            cards: flashcardSet.cards,
+            topic: flashcardSet.topic
+        });
+
+    } catch (error) {
+        console.error('❌ Colab AI error:', error.message);
+        if (error.response) {
+            console.error('Response data:', error.response.data);
+            console.error('Response status:', error.response.status);
+        }
+        
+        // Fallback
+        const fallbackCards = generateSmartFlashcards(req.body.text);
+        const flashcardSet = new FlashcardSet({
+            userId: req.userId,
+            topic: req.body.topic || 'Untitled Set',
+            sourceText: req.body.text,
+            cards: fallbackCards
+        });
+
+        await flashcardSet.save();
+
+        res.status(201).json({
+            message: '🔄 Flashcards generated with fallback method',
+            setId: flashcardSet._id,
+            cards: flashcardSet.cards,
+            topic: flashcardSet.topic
+        });
+    }
+});
+
 // Generate flashcards using OpenRouter (FREE)
 router.post('/generate', auth, async (req, res) => {
     try {

@@ -270,15 +270,14 @@ const HabitsPage = () => {
 
     return (
         <div className="max-w-5xl mx-auto px-4 py-8">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-                    <p className="text-sm text-gray-500">Track your daily habits</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600">👋 {user?.username}</span>
-                </div>
+            {/* Header - Only share button, no duplicate text */}
+            <div className="flex justify-end mb-8">
+                <ShareButton
+                    habits={habits}
+                    history={history}
+                    streak={streak}
+                    progress={progress}
+                />
             </div>
 
             {/* Stats Grid - 4 Cards */}

@@ -4,7 +4,9 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './components/Auth/Login';
 import Signup from './components/Auth/Signup';
-import HabitsPage from './components/Dashboard/HabitsPage'; // ✅ Changed import
+import HabitsPage from './components/Dashboard/HabitsPage';
+import Analytics from './components/Dashboard/Analytics';
+import Goals from './components/Dashboard/Goals';
 import Navbar from './components/Common/Navbar';
 
 const PrivateRoute = ({ children }) => {
@@ -21,7 +23,7 @@ const PublicRoute = ({ children }) => {
     const { user, loading } = useAuth();
     
     if (loading) {
-        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+        return <div className="min-h-screen flex items-center justify-center">Loading HabitFlow...</div>;
     }
     
     return user ? <Navigate to="/" /> : children;
@@ -45,6 +47,16 @@ function AppContent() {
                 <Route path="/" element={
                     <PrivateRoute>
                         <HabitsPage />
+                    </PrivateRoute>
+                } />
+                <Route path="/analytics" element={
+                    <PrivateRoute>
+                        <Analytics />
+                    </PrivateRoute>
+                } />
+                <Route path="/goals" element={
+                    <PrivateRoute>
+                        <Goals />
                     </PrivateRoute>
                 } />
             </Routes>

@@ -24,10 +24,10 @@ const StatCard = ({ icon, label, value, subtext, color }) => (
 );
 
 // ============================================================
-// MONTHLY CALENDAR COMPONENT
+// MONTHLY CALENDAR COMPONENT - WITH 3-COLOR SYSTEM
 // ============================================================
 
-const MonthlyCalendar = ({ history }) => {
+const MonthlyCalendar = ({ habits, history }) => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
     
     const year = currentMonth.getFullYear();
@@ -35,14 +35,29 @@ const MonthlyCalendar = ({ history }) => {
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     
-    // Create map of completed dates
-    const completedDates = {};
-    if (history) {
+    // Create a map of completed dates for each habit
+    const habitCompletions = {};
+    if (history && habits.length > 0) {
+        // Group history by date
+        const dateMap = {};
         history.forEach(day => {
-            if (day.completed) {
-                completedDates[day.date] = true;
-            }
+            if (!dateMap[day.date]) dateMap[day.date] = [];
+            dateMap[day.date].push(day.completed);
         });
+        
+        // For each date, count how many habits were completed
+        for (const date in dateMap) {
+            const completions = dateMap[date];
+            const totalHabits = habits.length;
+            const completedCount = completions.filter(c => c).length;
+            habitCompletions[date] = {
+                completed: completedCount,
+                total: totalHabits,
+                allDone: completedCount === totalHabits,
+                someDone: completedCount > 0 && completedCount < totalHabits,
+                noneDone: completedCount === 0
+            };
+        }
     }
     
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -53,17 +68,33 @@ const MonthlyCalendar = ({ history }) => {
     let completedCount = 0;
     let totalDays = 0;
     const today = new Date();
+    let allDoneDays = 0;
+    let someDoneDays = 0;
+    let noneDoneDays = 0;
     
     for (let i = 0; i < daysInMonth; i++) {
         const date = new Date(year, month, i + 1);
         const dateStr = date.toISOString().split('T')[0];
-        // Don't count future days
         if (date > today) continue;
         totalDays++;
-        if (completedDates[dateStr]) completedCount++;
+        
+        const dayData = habitCompletions[dateStr];
+        if (dayData) {
+            if (dayData.allDone) {
+                allDoneDays++;
+                completedCount++;
+            } else if (dayData.someDone) {
+                someDoneDays++;
+            } else {
+                noneDoneDays++;
+            }
+        } else {
+            noneDoneDays++;
+        }
     }
     
-    const monthProgress = totalDays > 0 ? Math.round((completedCount / totalDays) * 100) : 0;
+    const completionRate = totalDays > 0 ? Math.round((allDoneDays / totalDays) * 100) : 0;
+    const someRate = totalDays > 0 ? Math.round((someDoneDays / totalDays) * 100) : 0;
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
@@ -115,20 +146,38 @@ const MonthlyCalendar = ({ history }) => {
                     const date = new Date(year, month, day);
                     const dateStr = date.toISOString().split('T')[0];
                     const isToday = date.toDateString() === new Date().toDateString();
-                    const isCompleted = completedDates[dateStr] || false;
                     const isFuture = date > new Date();
+                    
+                    const dayData = habitCompletions[dateStr];
+                    let bgColor = 'bg-gray-50';
+                    let textColor = 'text-gray-400';
+                    let tooltipText = 'No data';
+                    
+                    if (!isFuture && dayData) {
+                        if (dayData.allDone) {
+                            bgColor = 'bg-green-500';
+                            textColor = 'text-white';
+                            tooltipText = `✅ All ${habits.length} habits done!`;
+                        } else if (dayData.someDone) {
+                            bgColor = 'bg-yellow-400';
+                            textColor = 'text-white';
+                            tooltipText = `⚠️ ${dayData.completed}/${habits.length} habits done`;
+                        } else {
+                            bgColor = 'bg-gray-200';
+                            textColor = 'text-gray-400';
+                            tooltipText = '❌ No habits done';
+                        }
+                    } else if (isFuture) {
+                        bgColor = 'bg-gray-50';
+                        textColor = 'text-gray-200';
+                        tooltipText = 'Future day';
+                    }
                     
                     return (
                         <div
                             key={day}
-                            className={`aspect-square flex items-center justify-center text-sm rounded-lg transition-colors ${
-                                isFuture 
-                                    ? 'text-gray-200' 
-                                    : isCompleted 
-                                        ? 'bg-green-500 text-white' 
-                                        : 'bg-gray-50 text-gray-400'
-                            } ${isToday && !isFuture ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
-                            title={`${dateStr}: ${isCompleted ? '✅' : '❌'}`}
+                            className={`aspect-square flex items-center justify-center text-sm rounded-lg transition-colors ${bgColor} ${textColor} ${isToday && !isFuture ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                            title={tooltipText}
                         >
                             {day}
                         </div>
@@ -136,20 +185,36 @@ const MonthlyCalendar = ({ history }) => {
                 })}
             </div>
             
-            <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
-                <div className="flex items-center gap-3">
+            {/* Legend and Stats */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="flex items-center gap-4 mb-2">
                     <div className="flex items-center gap-1">
                         <div className="w-3 h-3 rounded-sm bg-green-500"></div>
-                        <span className="text-xs text-gray-500">Done</span>
+                        <span className="text-xs text-gray-500">All done</span>
                     </div>
                     <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-sm bg-gray-50 border border-gray-200"></div>
-                        <span className="text-xs text-gray-500">Missed</span>
+                        <div className="w-3 h-3 rounded-sm bg-yellow-400"></div>
+                        <span className="text-xs text-gray-500">Partial</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-sm bg-gray-200"></div>
+                        <span className="text-xs text-gray-500">None</span>
                     </div>
                 </div>
-                <span className="text-xs font-medium text-gray-700">
-                    {completedCount}/{totalDays} days ({monthProgress}%)
-                </span>
+                <div className="flex justify-between items-center text-xs text-gray-500">
+                    <span>
+                        <span className="font-medium text-gray-700">{allDoneDays}</span> full days
+                    </span>
+                    <span>
+                        <span className="font-medium text-yellow-600">{someDoneDays}</span> partial days
+                    </span>
+                    <span>
+                        <span className="font-medium text-gray-400">{noneDoneDays}</span> missed days
+                    </span>
+                    <span className="font-medium text-indigo-600">
+                        {completionRate}% full
+                    </span>
+                </div>
             </div>
         </div>
     );
@@ -396,7 +461,7 @@ const HabitsPage = () => {
 
                 {/* Right Sidebar - Monthly Calendar */}
                 <div className="space-y-6">
-                    <MonthlyCalendar history={history} />
+                    <MonthlyCalendar habits={habits} history={history} />
                     
                     {/* Quick Quote */}
                     <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">

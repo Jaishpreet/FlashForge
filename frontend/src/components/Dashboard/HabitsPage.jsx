@@ -64,13 +64,11 @@ const MonthlyCalendar = ({ habits, history }) => {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    // Calculate stats for this month
-    let completedCount = 0;
-    let totalDays = 0;
-    const today = new Date();
     let allDoneDays = 0;
     let someDoneDays = 0;
     let noneDoneDays = 0;
+    let totalDays = 0;
+    const today = new Date();
     
     for (let i = 0; i < daysInMonth; i++) {
         const date = new Date(year, month, i + 1);
@@ -80,21 +78,15 @@ const MonthlyCalendar = ({ habits, history }) => {
         
         const dayData = habitCompletions[dateStr];
         if (dayData) {
-            if (dayData.allDone) {
-                allDoneDays++;
-                completedCount++;
-            } else if (dayData.someDone) {
-                someDoneDays++;
-            } else {
-                noneDoneDays++;
-            }
+            if (dayData.allDone) allDoneDays++;
+            else if (dayData.someDone) someDoneDays++;
+            else noneDoneDays++;
         } else {
             noneDoneDays++;
         }
     }
     
     const completionRate = totalDays > 0 ? Math.round((allDoneDays / totalDays) * 100) : 0;
-    const someRate = totalDays > 0 ? Math.round((someDoneDays / totalDays) * 100) : 0;
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
@@ -124,7 +116,6 @@ const MonthlyCalendar = ({ habits, history }) => {
                 </div>
             </div>
             
-            {/* Day headers */}
             <div className="grid grid-cols-7 gap-1 mb-1">
                 {days.map(d => (
                     <div key={d} className="text-center text-[10px] font-medium text-gray-400">
@@ -133,14 +124,11 @@ const MonthlyCalendar = ({ habits, history }) => {
                 ))}
             </div>
             
-            {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1">
-                {/* Empty cells for days before month starts */}
                 {Array.from({ length: firstDay }).map((_, i) => (
                     <div key={`empty-${i}`} className="aspect-square"></div>
                 ))}
                 
-                {/* Days of the month */}
                 {Array.from({ length: daysInMonth }).map((_, i) => {
                     const day = i + 1;
                     const date = new Date(year, month, day);
@@ -185,7 +173,6 @@ const MonthlyCalendar = ({ habits, history }) => {
                 })}
             </div>
             
-            {/* Legend and Stats */}
             <div className="mt-3 pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-4 mb-2">
                     <div className="flex items-center gap-1">
@@ -202,18 +189,10 @@ const MonthlyCalendar = ({ habits, history }) => {
                     </div>
                 </div>
                 <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span>
-                        <span className="font-medium text-gray-700">{allDoneDays}</span> full days
-                    </span>
-                    <span>
-                        <span className="font-medium text-yellow-600">{someDoneDays}</span> partial days
-                    </span>
-                    <span>
-                        <span className="font-medium text-gray-400">{noneDoneDays}</span> missed days
-                    </span>
-                    <span className="font-medium text-indigo-600">
-                        {completionRate}% full
-                    </span>
+                    <span><span className="font-medium text-gray-700">{allDoneDays}</span> full days</span>
+                    <span><span className="font-medium text-yellow-600">{someDoneDays}</span> partial days</span>
+                    <span><span className="font-medium text-gray-400">{noneDoneDays}</span> missed days</span>
+                    <span className="font-medium text-indigo-600">{completionRate}% full</span>
                 </div>
             </div>
         </div>
@@ -238,14 +217,29 @@ const HabitsPage = () => {
         fetchHabits();
     }, []);
 
+    // ============================================================
+    // FIXED: Get history for ALL habits
+    // ============================================================
+
     const fetchHabits = async () => {
         try {
             const response = await axios.get(`${API_URL}/habits`);
             setHabits(response.data);
-            // Get history for first habit
+            
+            // ✅ Get history for ALL habits
             if (response.data.length > 0) {
-                const histRes = await axios.get(`${API_URL}/habits/${response.data[0]._id}/history`);
-                setHistory(histRes.data.history || []);
+                const allHistory = [];
+                for (const habit of response.data) {
+                    try {
+                        const histRes = await axios.get(`${API_URL}/habits/${habit._id}/history`);
+                        if (histRes.data.history) {
+                            allHistory.push(...histRes.data.history);
+                        }
+                    } catch (error) {
+                        console.log(`No history for ${habit.name}`);
+                    }
+                }
+                setHistory(allHistory);
             }
         } catch (error) {
             toast.error('Failed to load habits');
@@ -311,11 +305,22 @@ const HabitsPage = () => {
     const totalHabits = habits.length;
     const progress = totalHabits > 0 ? Math.round((completedToday / totalHabits) * 100) : 0;
 
-    // Calculate streak from history
     const calculateStreak = () => {
         let streak = 0;
-        for (let i = history.length - 1; i >= 0; i--) {
-            if (history[i].completed) {
+        // Group history by date and check if ALL habits were done each day
+        if (history.length === 0 || habits.length === 0) return 0;
+        
+        const dateMap = {};
+        history.forEach(day => {
+            if (!dateMap[day.date]) dateMap[day.date] = [];
+            dateMap[day.date].push(day.completed);
+        });
+        
+        const dates = Object.keys(dateMap).sort();
+        for (let i = dates.length - 1; i >= 0; i--) {
+            const completions = dateMap[dates[i]];
+            const allDone = completions.filter(c => c).length === habits.length;
+            if (allDone) {
                 streak++;
             } else {
                 break;
@@ -335,8 +340,10 @@ const HabitsPage = () => {
 
     return (
         <div className="max-w-5xl mx-auto px-4 py-8">
+            <div className="flex justify-end mb-6">
+                {/* Share button removed */}
+            </div>
 
-            {/* Stats Grid - 4 Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <StatCard 
                     icon="🔥" 
@@ -368,9 +375,7 @@ const HabitsPage = () => {
                 />
             </div>
 
-            {/* Main Content */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Habits List */}
                 <div className="lg:col-span-2">
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="flex justify-between items-center p-4 border-b border-gray-100">
@@ -383,7 +388,6 @@ const HabitsPage = () => {
                             </button>
                         </div>
 
-                        {/* Add Habit Form */}
                         {showAddForm && (
                             <form onSubmit={createHabit} className="p-4 border-b border-gray-100 bg-gray-50">
                                 <div className="flex gap-3">
@@ -414,7 +418,6 @@ const HabitsPage = () => {
                             </form>
                         )}
 
-                        {/* Habit List */}
                         {habits.length === 0 ? (
                             <div className="text-center py-12">
                                 <span className="text-4xl block mb-3">🌟</span>
@@ -459,11 +462,9 @@ const HabitsPage = () => {
                     </div>
                 </div>
 
-                {/* Right Sidebar - Monthly Calendar */}
                 <div className="space-y-6">
                     <MonthlyCalendar habits={habits} history={history} />
                     
-                    {/* Quick Quote */}
                     <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
                         <p className="text-sm text-gray-700 italic">
                             "Small daily improvements over time lead to stunning results."

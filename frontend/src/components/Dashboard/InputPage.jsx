@@ -22,7 +22,7 @@ const InputPage = () => {
 
         try {
             const response = await axios.post(
-                `${API_URL}/flashcards/generate`,
+                `${API_URL}/flashcards/generate-colab`,
                 { text, topic: topic || 'Untitled Set' }
             );
 

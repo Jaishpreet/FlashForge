@@ -85,12 +85,12 @@ router.delete('/:id', auth, async (req, res) => {
 });
 
 // ============================================================
-// TOGGLE TODAY'S COMPLETION
+// TOGGLE COMPLETION (WITH CUSTOM DATE SUPPORT)
 // ============================================================
 
 router.post('/:id/log', auth, async (req, res) => {
     try {
-        const { completed } = req.body;
+        const { completed, date } = req.body; // ✅ Added 'date' here
 
         const habit = await Habit.findOne({
             _id: req.params.id,
@@ -101,13 +101,14 @@ router.post('/:id/log', auth, async (req, res) => {
             return res.status(404).json({ error: 'Habit not found' });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // ✅ Use provided date or default to today
+        let logDate = date ? new Date(date) : new Date();
+        logDate.setHours(0, 0, 0, 0);
 
         let log = await HabitLog.findOne({
             habitId: req.params.id,
             userId: req.userId,
-            date: today
+            date: logDate
         });
 
         if (log) {
@@ -117,7 +118,7 @@ router.post('/:id/log', auth, async (req, res) => {
             log = new HabitLog({
                 habitId: req.params.id,
                 userId: req.userId,
-                date: today,
+                date: logDate,
                 completed: completed !== undefined ? completed : true
             });
             await log.save();

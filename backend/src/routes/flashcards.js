@@ -5,9 +5,7 @@ import { auth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// ============================================================
-// 1. GENERATE FLASHCARDS
-// ============================================================
+// Generate flashcards using OpenRouter (FREE)
 router.post('/generate', auth, async (req, res) => {
     try {
         const { text, topic } = req.body;
@@ -19,42 +17,63 @@ router.post('/generate', auth, async (req, res) => {
         let cards = [];
         let usedAI = false;
 
-        // === TRY HUGGING FACE API ===
+        // === TRY OPENROUTER API ===
         try {
-            console.log('📤 Attempting Hugging Face API...');
+            console.log('📤 Attempting OpenRouter API...');
             
-            const prompt = `Create 8-10 flashcards from this text. 
-            Format EXACTLY as:
-            Q: question?
-            A: answer
-            
-            Text: ${text.substring(0, 1500)}`;
+            const prompt = `Create 8-10 flashcards from this study material.
+Each flashcard must have a clear QUESTION and a clear ANSWER.
+Format EXACTLY like this for each card:
+
+Q: What is photosynthesis?
+A: The process by which plants convert light energy into chemical energy.
+
+Q: What is the Calvin cycle?
+A: The light-independent reactions of photosynthesis where CO2 is fixed into glucose.
+
+Text to create flashcards from:
+${text.substring(0, 2000)}
+
+Now create 8-10 flashcards following the exact Q: / A: format above.`;
 
             const response = await axios.post(
-                `https://api-inference.huggingface.co/models/google/flan-t5-base`,
+                'https://openrouter.ai/api/v1/chat/completions',
                 {
-                    inputs: prompt,
-                    parameters: {
-                        max_length: 800,
-                        temperature: 0.5,
-                        do_sample: true
-                    }
+                    model: 'meta-llama/llama-4-scout:free', // Free model
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'You are a study assistant that creates high-quality flashcards. Always respond in Q: / A: format only.'
+                        },
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    temperature: 0.5,
+                    max_tokens: 800
                 },
                 {
                     headers: {
-                        'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`
+                        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                        'Content-Type': 'application/json',
+                        'HTTP-Referer': 'https://flash-forge-769x.vercel.app',
+                        'X-Title': 'FlashForge'
                     },
-                    timeout: 30000
+                    timeout: 45000
                 }
             );
 
-            const generatedText = response.data[0]?.generated_text || '';
+            console.log('✅ OpenRouter response received');
+
+            const generatedText = response.data?.choices?.[0]?.message?.content || '';
             cards = parseFlashcards(generatedText);
             usedAI = true;
-            console.log(`✅ AI generated ${cards.length} cards`);
+            console.log(`📊 AI generated ${cards.length} cards`);
 
         } catch (aiError) {
-            console.log('❌ AI failed, using smart fallback:', aiError.message);
+            console.log('❌ OpenRouter failed, using smart fallback:', aiError.message);
+            // Fall through to smart generation
         }
 
         // === SMART FALLBACK (No API needed) ===
@@ -84,7 +103,7 @@ router.post('/generate', auth, async (req, res) => {
         await flashcardSet.save();
 
         res.status(201).json({
-            message: usedAI ? '✨ Flashcards generated with AI!' : '📝 Flashcards generated from your text',
+            message: usedAI ? '✨ Flashcards generated with OpenRouter AI!' : '📝 Flashcards generated from your text',
             setId: flashcardSet._id,
             cards: flashcardSet.cards,
             topic: flashcardSet.topic
@@ -93,7 +112,9 @@ router.post('/generate', auth, async (req, res) => {
     } catch (error) {
         console.error('❌ Fatal error:', error.message);
         
+        // ULTIMATE FALLBACK
         const fallbackCards = generateSmartFlashcards(req.body.text);
+        
         const flashcardSet = new FlashcardSet({
             userId: req.userId,
             topic: req.body.topic || 'Untitled Set',
@@ -112,9 +133,7 @@ router.post('/generate', auth, async (req, res) => {
     }
 });
 
-// ============================================================
-// HELPER: Parse AI Response
-// ============================================================
+// === PARSE AI RESPONSE ===
 function parseFlashcards(text) {
     const cards = [];
     const lines = text.split('\n');
@@ -153,9 +172,7 @@ function parseFlashcards(text) {
     return cards;
 }
 
-// ============================================================
-// HELPER: Smart Fallback (No API)
-// ============================================================
+// === SMART FALLBACK ===
 function generateSmartFlashcards(text) {
     const cards = [];
     const cleanText = text.replace(/\s+/g, ' ').trim();
@@ -209,9 +226,7 @@ function splitIntoChunks(text, chunkSize = 3) {
     return chunks;
 }
 
-// ============================================================
-// 2. GET ALL SETS - /api/flashcards
-// ============================================================
+// === GET /api/flashcards ===
 router.get('/', auth, async (req, res) => {
     try {
         const sets = await FlashcardSet.find({ userId: req.userId })
@@ -232,9 +247,7 @@ router.get('/', auth, async (req, res) => {
     }
 });
 
-// ============================================================
-// 3. GET ONE SET - /api/flashcards/:id
-// ============================================================
+// === GET /api/flashcards/:id ===
 router.get('/:id', auth, async (req, res) => {
     try {
         const set = await FlashcardSet.findOne({ 
@@ -252,9 +265,7 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
-// ============================================================
-// 4. UPDATE STUDY PROGRESS - /api/flashcards/:id/study
-// ============================================================
+// === PATCH /api/flashcards/:id/study ===
 router.patch('/:id/study', auth, async (req, res) => {
     try {
         const set = await FlashcardSet.findOneAndUpdate(
@@ -276,13 +287,10 @@ router.patch('/:id/study', auth, async (req, res) => {
     }
 });
 
-// ============================================================
-// 5. DELETE A SET - /api/flashcards/:id  ✅ THIS IS YOUR DELETE ROUTE
-// ============================================================
+// === DELETE /api/flashcards/:id ===
 router.delete('/:id', auth, async (req, res) => {
     try {
         console.log(`🗑️ Attempting to delete set with ID: ${req.params.id}`);
-        console.log(`👤 User ID: ${req.userId}`);
         
         const deletedSet = await FlashcardSet.findOneAndDelete({ 
             _id: req.params.id, 
@@ -290,7 +298,6 @@ router.delete('/:id', auth, async (req, res) => {
         });
 
         if (!deletedSet) {
-            console.log(`❌ Set not found or doesn't belong to user`);
             return res.status(404).json({ 
                 error: 'Flashcard set not found or you don\'t have permission to delete it' 
             });
